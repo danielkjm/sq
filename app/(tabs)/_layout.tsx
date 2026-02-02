@@ -12,7 +12,13 @@ export default function TabLayout() {
         tabBarActiveTintColor: '#000',
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarShowLabel: false,
-        tabBarStyle: { paddingTop: 12 },
+        tabBarStyle: {
+          paddingTop: 12,
+          borderTopWidth: 0,
+          borderTopColor: 'transparent',
+          elevation: 0,
+          shadowOpacity: 0,
+        },
       }}>
       <Tabs.Screen
         name="index"
