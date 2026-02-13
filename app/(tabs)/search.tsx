@@ -260,7 +260,7 @@ export default function SearchScreen() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               scrollEventThrottle={16}>
-              <View className="flex-row flex-wrap gap-8 px-5 pb-32 pt-5">
+              <View className="flex-row flex-wrap gap-4 px-3 pb-32 pt-5">
                 {(() => {
                   const filtered = PRODUCTS.filter((product) => product.filters.includes(filter));
                   const columns = buildMasonryColumns(filtered, filterIndex);
@@ -268,7 +268,7 @@ export default function SearchScreen() {
                   const renderCard = (item: Product & { aspectRatio: number }) => (
                     <View key={item.id}>
                       <View
-                        className="w-full overflow-hidden rounded-2xl bg-zinc-100"
+                        className="w-full overflow-hidden rounded-md bg-zinc-100"
                         style={{ aspectRatio: item.aspectRatio }}>
                         <Image source={item.image} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                       </View>
