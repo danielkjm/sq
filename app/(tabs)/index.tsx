@@ -1,220 +1,215 @@
-import { ResizeMode, Video } from 'expo-av';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 
-const CATEGORIES = ['All', 'Home', 'Apparel', 'Beauty & Wellness'] as const;
+const FILTERS = ['All', 'Experts', 'Friends', 'Your Brands'] as const;
 
-type Category = (typeof CATEGORIES)[number];
+type Filter = (typeof FILTERS)[number];
 
-type FeedItem = {
+type Product = {
   id: string;
-  category: Category;
-  type: 'image' | 'video';
+  brand: string;
   title: string;
-  subtitle: string;
-  source: string | number;
+  image: number;
+  filters: Filter[];
 };
 
-type MediaSource = {
-  type: 'image' | 'video';
-  source: number;
+type BentoSize = 'wide' | 'tall' | 'square';
+
+const PRODUCTS: Product[] = [
+  {
+    id: 'nike-pegasus',
+    brand: 'Nike',
+    title: 'Pegasus Premium',
+    image: require('@/assets/images/nb-1960r.png'),
+    filters: ['All', 'Experts'],
+  },
+  {
+    id: 'mod-ref',
+    brand: 'Mod Ref',
+    title: 'The Clark Sweater',
+    image: require('@/assets/images/Corridor.png'),
+    filters: ['All', 'Friends'],
+  },
+  {
+    id: 'oakley-goggles',
+    brand: 'Oakley',
+    title: 'Flow Scape Snow Goggles',
+    image: require('@/assets/images/oas.png'),
+    filters: ['All', 'Experts'],
+  },
+  {
+    id: 'pyra-pack',
+    brand: 'Pyra',
+    title: 'Expedition Bag',
+    image: require('@/assets/images/latetowork.png'),
+    filters: ['All', 'Friends'],
+  },
+  {
+    id: 'lelabo-santal',
+    brand: 'Le Labo',
+    title: 'Santal 33',
+    image: require('@/assets/images/lelabo.png'),
+    filters: ['All', 'Your Brands'],
+  },
+  {
+    id: 'aesop-resin',
+    brand: 'Aesop',
+    title: 'Resurrection Aromatique',
+    image: require('@/assets/images/aesop-soap.png'),
+    filters: ['All', 'Your Brands'],
+  },
+  {
+    id: 'snif-crumb',
+    brand: 'Snif',
+    title: 'Crumb Couture',
+    image: require('@/assets/images/snif-crumb.png'),
+    filters: ['All', 'Your Brands'],
+  },
+  {
+    id: 'salt-stone',
+    brand: 'Salt & Stone',
+    title: 'Bergamot + Hinoki',
+    image: require('@/assets/images/salt&stone.png'),
+    filters: ['All', 'Your Brands'],
+  },
+  {
+    id: 'west-elm-basket',
+    brand: 'West Elm',
+    title: 'Herman Basket',
+    image: require('@/assets/images/west-elm-herman-basket-woven.png'),
+    filters: ['All', 'Friends'],
+  },
+  {
+    id: 'frama-table',
+    brand: 'Frama',
+    title: 'Farmhouse Table',
+    image: require('@/assets/images/frama-table.png'),
+    filters: ['All', 'Experts'],
+  },
+  {
+    id: 'metastudio-shelf',
+    brand: 'Metastudio',
+    title: 'Console Shelf',
+    image: require('@/assets/images/metastudio.png'),
+    filters: ['All', 'Friends'],
+  },
+  {
+    id: 'imakebook-light',
+    brand: 'I Make Book',
+    title: 'Studio Light',
+    image: require('@/assets/images/imakebook.png'),
+    filters: ['All', 'Experts'],
+  },
+  {
+    id: 'soosatelier',
+    brand: 'Soos Atelier',
+    title: 'Neroli Wash',
+    image: require('@/assets/images/soosatelier.png'),
+    filters: ['All', 'Your Brands'],
+  },
+  {
+    id: 'auter-coat',
+    brand: 'Auter',
+    title: 'City Shell',
+    image: require('@/assets/images/auter.png'),
+    filters: ['All', 'Experts'],
+  },
+  {
+    id: 'west-elm-sebastion',
+    brand: 'West Elm',
+    title: 'Sebastion Chair',
+    image: require('@/assets/images/west-elm-sebastion.png'),
+    filters: ['All', 'Friends'],
+  },
+];
+
+const BENTO_PATTERN: BentoSize[] = ['tall', 'square', 'tall', 'square', 'tall', 'square', 'tall', 'square'];
+const getBentoSize = (index: number, seed: number) => {
+  return BENTO_PATTERN[(index + seed) % BENTO_PATTERN.length];
 };
 
-type MediaDeckState = {
-  deck: MediaSource[];
-  index: number;
-};
-
-const resolveSource = (source: string | number) => {
-  return typeof source === 'string' ? { uri: source } : source;
-};
-
-const HOME_IMAGES = [
-  require('@/assets/images/west-elm-herman-basket-woven.png'),
-  require('@/assets/images/west-elm-sebastion.png'),
-  require('@/assets/images/frama-table.png'),
-  require('@/assets/images/metastudio.png'),
-  require('@/assets/images/imakebook.png'),
-];
-
-const APPAREL_IMAGES = [
-  require('@/assets/images/Corridor.png'),
-  require('@/assets/images/nb-1960r.png'),
-  require('@/assets/images/auter.png'),
-  require('@/assets/images/latetowork.png'),
-  require('@/assets/images/oas.png'),
-];
-
-const BEAUTY_IMAGES = [
-  require('@/assets/images/aesop-soap.png'),
-  require('@/assets/images/lelabo.png'),
-  require('@/assets/images/salt&stone.png'),
-  require('@/assets/images/snif-crumb.png'),
-  require('@/assets/images/soosatelier.png'),
-];
-
-const IMAGE_SOURCES: Record<Category, number[]> = {
-  All: [...HOME_IMAGES, ...APPAREL_IMAGES, ...BEAUTY_IMAGES],
-  Home: HOME_IMAGES,
-  Apparel: APPAREL_IMAGES,
-  'Beauty & Wellness': BEAUTY_IMAGES,
-};
-
-const HOME_VIDEOS = [require('@/assets/vid/frama-farmhouse.mp4')];
-const APPAREL_VIDEOS = [require('@/assets/vid/buckmason.mp4'), require('@/assets/vid/nothingsomething.mp4')];
-const BEAUTY_VIDEOS = [
-  require('@/assets/vid/snif.mp4'),
-  require('@/assets/vid/aesop-fragrance.mp4'),
-  require('@/assets/vid/elorea-city.mp4'),
-  require('@/assets/vid/elorea-blue.mp4'),
-];
-
-const VIDEO_SOURCES: Record<Category, number[]> = {
-  All: [...HOME_VIDEOS, ...APPAREL_VIDEOS, ...BEAUTY_VIDEOS],
-  Home: HOME_VIDEOS,
-  Apparel: APPAREL_VIDEOS,
-  'Beauty & Wellness': BEAUTY_VIDEOS,
-};
-
-const TITLES = [
-  'The Clark Sweater',
-  'Studio Linen Shirt',
-  'Midnight Runner',
-  'Softline Hoodie',
-  'Lakeview Jacket',
-  'Atlas Tote',
-];
-
-const SUBTITLES = [
-  'Refined layers for work and play.',
-  'Lightweight and breathable for daily wear.',
-  'Balanced cushioning with minimal profile.',
-  'Relaxed fit with clean lines.',
-  'Structured outerwear with subtle texture.',
-  'Carry-everywhere canvas with leather trim.',
-];
-
-const shuffle = <T,>(items: T[]) => {
-  const copy = [...items];
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+const getAspectRatio = (size: BentoSize) => {
+  if (size === 'tall') {
+    return 3 / 4;
   }
-  return copy;
+  return 1;
 };
 
-const buildInterleavedDeck = (images: number[], videos: number[]) => {
-  const shuffledImages = shuffle(images);
-  const shuffledVideos = shuffle(videos);
-  const deck: MediaSource[] = [];
-  let imageIndex = 0;
-  let videoIndex = 0;
-  let lastType: MediaSource['type'] | null = null;
+const styles = StyleSheet.create({
+  blurFill: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  dispersionLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  dispersionTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  },
+  dispersionLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 2,
+    backgroundColor: 'rgba(120, 200, 255, 0.25)',
+  },
+  dispersionRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 2,
+    backgroundColor: 'rgba(255, 140, 200, 0.22)',
+  },
+});
 
-  while (imageIndex < shuffledImages.length || videoIndex < shuffledVideos.length) {
-    const remainingImages = shuffledImages.length - imageIndex;
-    const remainingVideos = shuffledVideos.length - videoIndex;
-    let nextType: MediaSource['type'];
+const buildMasonryColumns = (items: Product[], seed: number) => {
+  const left: { items: (Product & { size: BentoSize; aspectRatio: number })[]; height: number } = {
+    items: [],
+    height: 0,
+  };
+  const right: { items: (Product & { size: BentoSize; aspectRatio: number })[]; height: number } = {
+    items: [],
+    height: 0,
+  };
 
-    if (remainingImages === 0) {
-      nextType = 'video';
-    } else if (remainingVideos === 0) {
-      nextType = 'image';
-    } else if (lastType === 'image') {
-      nextType = 'video';
-    } else if (lastType === 'video') {
-      nextType = 'image';
-    } else {
-      nextType = remainingImages >= remainingVideos ? 'image' : 'video';
-    }
+  items.forEach((item, index) => {
+    const size = getBentoSize(index, seed);
+    const aspectRatio = getAspectRatio(size);
+    const weight = 1 / aspectRatio;
+    const target = left.height <= right.height ? left : right;
 
-    if (nextType === 'image') {
-      deck.push({ type: 'image', source: shuffledImages[imageIndex] });
-      imageIndex += 1;
-      lastType = 'image';
-    } else {
-      deck.push({ type: 'video', source: shuffledVideos[videoIndex] });
-      videoIndex += 1;
-      lastType = 'video';
-    }
-  }
+    target.items.push({ ...item, size, aspectRatio });
+    target.height += weight;
+  });
 
-  return deck;
+  return { left: left.items, right: right.items };
 };
-
-const INITIAL_BATCH = 6;
-const NEXT_BATCH = 4;
 
 export default function HomeScreen() {
   const pagerRef = useRef<PagerView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const activeIndexRef = useRef(0);
-  const mediaDecksRef = useRef<Record<Category, MediaDeckState> | null>(null);
-
-  if (!mediaDecksRef.current) {
-    mediaDecksRef.current = CATEGORIES.reduce((acc, category) => {
-      acc[category] = {
-        deck: buildInterleavedDeck(IMAGE_SOURCES[category], VIDEO_SOURCES[category]),
-        index: 0,
-      };
-      return acc;
-    }, {} as Record<Category, MediaDeckState>);
-  }
-
-  const getNextMedia = (category: Category) => {
-    const deckState = mediaDecksRef.current?.[category];
-    if (!deckState) {
-      return { type: 'image' as const, source: IMAGE_SOURCES[category][0] };
-    }
-    if (deckState.deck.length === 0) {
-      return { type: 'image' as const, source: IMAGE_SOURCES[category][0] };
-    }
-    if (deckState.index >= deckState.deck.length) {
-      deckState.deck = buildInterleavedDeck(IMAGE_SOURCES[category], VIDEO_SOURCES[category]);
-      deckState.index = 0;
-    }
-    const media = deckState.deck[deckState.index];
-    deckState.index += 1;
-    return media;
-  };
-
-  const createBatch = (category: Category, offset: number, count: number): FeedItem[] => {
-    return Array.from({ length: count }, (_, index) => {
-      const position = offset + index;
-      const title = TITLES[position % TITLES.length];
-      const subtitle = SUBTITLES[position % SUBTITLES.length];
-      const media = getNextMedia(category);
-
-      return {
-        id: `${category}-${position}`,
-        category,
-        type: media.type,
-        title,
-        subtitle,
-        source: media.source,
-      };
-    });
-  };
-
-  const [feeds, setFeeds] = useState<Record<Category, FeedItem[]>>(() => {
-    return CATEGORIES.reduce((acc, category) => {
-      acc[category] = createBatch(category, 0, INITIAL_BATCH);
-      return acc;
-    }, {} as Record<Category, FeedItem[]>);
-  });
+  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-      <View className="border-b border-zinc-200">
+      <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View className="flex-row items-center gap-8 px-6 pb-4 pt-4">
-            {CATEGORIES.map((label, index) => {
+          <View className="flex-row items-center gap-3 px-6 pb-4 pt-6">
+            {FILTERS.map((label, index) => {
               const isActive = index === activeIndex;
               return (
                 <Pressable
@@ -223,11 +218,14 @@ export default function HomeScreen() {
                     activeIndexRef.current = index;
                     setActiveIndex(index);
                     pagerRef.current?.setPage(index);
-                  }}>
+                  }}
+                  className={`rounded-full border px-4 py-2 ${
+                    isActive ? 'border-zinc-900 bg-zinc-900' : 'border-zinc-200 bg-white'
+                  }`}>
                   <ThemedText
-                    className="text-[12px] font-medium"
+                    className="text-[12px] font-semibold"
                     numberOfLines={1}
-                    style={{ color: isActive ? '#111827' : '#9CA3AF' }}>
+                    style={{ color: isActive ? '#FFFFFF' : '#111827' }}>
                     {label.toUpperCase()}
                   </ThemedText>
                 </Pressable>
@@ -257,55 +255,102 @@ export default function HomeScreen() {
             setActiveIndex(nextIndex);
           }
         }}>
-        {CATEGORIES.map((category) => (
-          <View key={category} style={{ flex: 1 }}>
-            <FlatList
-              data={feeds[category]}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 24 }}
-              showsVerticalScrollIndicator={false}
-              onEndReachedThreshold={0.6}
-              onEndReached={() => {
-                setFeeds((prev) => {
-                  const current = prev[category];
-                  const nextItems = createBatch(category, current.length, NEXT_BATCH);
-                  return { ...prev, [category]: [...current, ...nextItems] };
-                });
-              }}
-              renderItem={({ item }) => (
-                <View className="mb-8">
-                  <View className="w-full overflow-hidden rounded-lg bg-zinc-100" style={{ aspectRatio: 4 / 5 }}>
-                    {item.type === 'image' ? (
-                      <Image
-                        source={resolveSource(item.source)}
-                        style={{ width: '100%', height: '100%' }}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <Video
-                        source={resolveSource(item.source)}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode={ResizeMode.COVER}
-                        isMuted
-                        isLooping
-                        shouldPlay
-                      />
-                    )}
-                  </View>
-                  <View className="mt-3">
-                    <ThemedText className="text-[16px] font-semibold" style={{ color: '#111827' }}>
-                      {item.title}
-                    </ThemedText>
-                    <ThemedText className="mt-1 text-[13px]" style={{ color: '#6B7280' }}>
-                      {item.subtitle}
-                    </ThemedText>
-                  </View>
-                </View>
-              )}
-            />
+        {FILTERS.map((filter, filterIndex) => (
+          <View key={filter} style={{ flex: 1 }}>
+            <ScrollView showsVerticalScrollIndicator={false} scrollEventThrottle={16}>
+              <View className="flex-row flex-wrap gap-4 px-2 pb-32 pt-5">
+                {(() => {
+                  const filtered = PRODUCTS.filter((product) => product.filters.includes(filter));
+                  const columns = buildMasonryColumns(filtered, filterIndex);
+
+                  const renderCard = (item: Product & { aspectRatio: number }) => (
+                    <View key={item.id}>
+                      <View
+                        className="w-full overflow-hidden rounded-lg bg-zinc-100"
+                        style={{ aspectRatio: item.aspectRatio }}>
+                        <Image source={item.image} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                      </View>
+                      <View className="mt-3">
+                        <ThemedText className="text-[11px] font-semibold uppercase tracking-[0.8px] text-zinc-500">
+                          {item.brand}
+                        </ThemedText>
+                        <ThemedText className="text-[12px] font-medium text-zinc-900">
+                          {item.title}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  );
+
+                  return (
+                    <>
+                      <View className="flex-1 gap-8">{columns.left.map(renderCard)}</View>
+                      <View className="flex-1 gap-8">{columns.right.map(renderCard)}</View>
+                    </>
+                  );
+                })()}
+              </View>
+            </ScrollView>
           </View>
         ))}
       </PagerView>
+
+      <View className="absolute bottom-6 left-0 right-0 px-6" pointerEvents={chatOpen ? 'none' : 'auto'}>
+        <Pressable
+          onPress={() => setChatOpen(true)}
+          className="overflow-hidden rounded-2xl border border-white/70 shadow-lg shadow-black/25">
+          <BlurView intensity={45} tint="light" style={styles.blurFill} />
+          <View className="absolute inset-0 bg-white/55" />
+          <View pointerEvents="none" style={styles.dispersionLayer}>
+            <View style={styles.dispersionTop} />
+            <View style={styles.dispersionLeft} />
+            <View style={styles.dispersionRight} />
+          </View>
+          <View className="flex-row items-center justify-between px-5 py-6">
+            <ThemedText className="text-[12px] font-medium text-zinc-700">
+              "Formal and casual sweaters for the winter..."
+            </ThemedText>
+            <View className="ml-4 flex-row items-center gap-1">
+              <View className="h-3 w-[2px] rounded-full bg-zinc-900" />
+              <View className="h-4 w-[2px] rounded-full bg-zinc-900" />
+              <View className="h-2 w-[2px] rounded-full bg-zinc-900" />
+            </View>
+          </View>
+        </Pressable>
+      </View>
+
+      {chatOpen ? (
+        <View className="absolute inset-0">
+          <Pressable className="flex-1 bg-black/10" onPress={() => setChatOpen(false)} />
+          <View className="overflow-hidden rounded-t-[28px] border border-white/70 shadow-2xl shadow-black/25">
+            <BlurView intensity={60} tint="light" style={styles.blurFill} />
+            <View className="absolute inset-0 bg-white/60" />
+            <View pointerEvents="none" style={styles.dispersionLayer}>
+              <View style={styles.dispersionTop} />
+              <View style={styles.dispersionLeft} />
+              <View style={styles.dispersionRight} />
+            </View>
+            <View className="px-6 pb-8 pt-4">
+              <View className="mx-auto h-1.5 w-14 rounded-full bg-zinc-300" />
+              <View className="mt-4">
+                <ThemedText className="text-center text-[12px] font-semibold text-zinc-500">Chat</ThemedText>
+              </View>
+              <View className="mt-6 flex-1">
+                <ThemedText className="text-[14px] leading-6 text-zinc-700">
+                  Sure - tell me what you're looking for and I'll refine the feed.
+                </ThemedText>
+              </View>
+              <View className="mt-6 flex-row items-center justify-between rounded-full bg-white/70 px-4 py-3">
+                <ThemedText className="text-[13px] text-zinc-500">Ask anything</ThemedText>
+                <View className="flex-row items-center gap-1">
+                  <View className="h-3 w-[2px] rounded-full bg-zinc-900" />
+                  <View className="h-4 w-[2px] rounded-full bg-zinc-900" />
+                  <View className="h-2 w-[2px] rounded-full bg-zinc-900" />
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Tabs } from 'expo-router';
-import { Home, Search, User } from 'lucide-react-native';
+import { Home, User } from 'lucide-react-native';
 
 const ICON_SIZE = 20;
 
@@ -28,10 +28,27 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="adv2"
         options={{
-          title: 'Search',
-          tabBarIcon: ({ color }) => <Search color={color} size={ICON_SIZE} />,
+          title: 'Adv2',
+          tabBarActiveTintColor: '#FFFFFF',
+          tabBarInactiveTintColor: '#6B7280',
+          tabBarStyle: {
+            paddingTop: 12,
+            borderTopWidth: 0,
+            borderTopColor: 'transparent',
+            elevation: 0,
+            shadowOpacity: 0,
+            backgroundColor: '#000000',
+          },
+          tabBarIcon: ({ color }) => (
+            <Image
+              source={require('@/assets/images/ad.png')}
+              style={{ width: ICON_SIZE, height: ICON_SIZE }}
+              tintColor={color}
+              contentFit="contain"
+            />
+          ),
         }}
       />
       <Tabs.Screen
