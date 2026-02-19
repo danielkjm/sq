@@ -1,7 +1,10 @@
 import { ResizeMode, Video } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import PagerView from 'react-native-pager-view';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -29,11 +32,18 @@ const HOME_IMAGES = [
 ];
 
 const APPAREL_IMAGES = [
-  require('@/assets/images/Corridor.png'),
-  require('@/assets/images/nb-1960r.png'),
-  require('@/assets/images/auter.png'),
-  require('@/assets/images/latetowork.png'),
-  require('@/assets/images/oas.png'),
+  require('@/assets/images/Nike - Nike Stride.png'),
+  require('@/assets/images/Nike - Sabrina 3 "Warnign Label".png'),
+  require('@/assets/images/Nike Free Metcon 6 SE.png'),
+  require('@/assets/images/ON - Cloud 6.png'),
+  require('@/assets/images/ON - Club Collective-T Geo.png'),
+  require('@/assets/images/ON - The Roger Pro Fire.png'),
+  require('@/assets/images/Mod Ref - The Colin Top.png'),
+  require('@/assets/images/Mod Ref - The Dominic Shirt.png'),
+  require('@/assets/images/Mod Ref - The Jeremy Top.png'),
+  require('@/assets/images/Buck Mason - Cloudloom Cotton Wool Carry-on Jacket.png'),
+  require('@/assets/images/Buck Mason - Japanese Twill Belted-Back Chore Jacket.png'),
+  require("@/assets/images/Buck Mason - Old Herc' Denim Work Shirt.png"),
 ];
 
 const BEAUTY_IMAGES = [
@@ -171,12 +181,18 @@ const buildReelItems = (category: Category, count: number) => {
 export default function Adv2Screen() {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const pagerRef = useRef<PagerView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const activeCategory = CATEGORIES[activeIndex];
-  const filterBarHeight = insets.top + 44;
-  const reelHeight = Math.max(0, height - filterBarHeight);
+  const activeIndexRef = useRef(0);
+  const reelHeight = Math.max(0, height - tabBarHeight - insets.top);
 
-  const reels = useMemo(() => buildReelItems(activeCategory, 12), [activeCategory]);
+  const reelsByCategory = useMemo(() => {
+    return CATEGORIES.reduce((acc, category) => {
+      acc[category] = buildReelItems(category, 12);
+      return acc;
+    }, {} as Record<Category, ReelItem[]>);
+  }, []);
 
   return (
     <SafeAreaView className="flex-1 bg-black" edges={['top']}>
@@ -188,7 +204,13 @@ export default function Adv2Screen() {
             {CATEGORIES.map((label, index) => {
               const isActive = index === activeIndex;
               return (
-                <Pressable key={label} onPress={() => setActiveIndex(index)}>
+                <Pressable
+                  key={label}
+                  onPress={() => {
+                    activeIndexRef.current = index;
+                    setActiveIndex(index);
+                    pagerRef.current?.setPage(index);
+                  }}>
                   <ThemedText
                     className="text-[12px] font-semibold"
                     numberOfLines={1}
@@ -202,46 +224,78 @@ export default function Adv2Screen() {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={reels}
-        keyExtractor={(item) => item.id}
-        pagingEnabled
-        showsVerticalScrollIndicator={false}
-        snapToInterval={reelHeight}
-        snapToAlignment="start"
-        disableIntervalMomentum
-        decelerationRate="fast"
-        contentContainerStyle={{ paddingTop: filterBarHeight }}
-        getItemLayout={(_, index) => ({
-          length: reelHeight,
-          offset: filterBarHeight + reelHeight * index,
-          index,
-        })}
-        renderItem={({ item }) => (
-          <View style={{ height: reelHeight }}>
-            {item.type === 'image' ? (
-              <Image source={item.source} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-            ) : (
-              <Video
-                source={item.source}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode={ResizeMode.COVER}
-                isMuted
-                isLooping
-                shouldPlay
-              />
-            )}
-            <View className="absolute bottom-0 left-0 right-0 px-6 pb-10">
-              <View className="mb-2 flex-row items-center gap-3">
-                <ThemedText className="text-[13px] font-semibold text-white">{item.title}</ThemedText>
-                <View className="h-1.5 w-1.5 rounded-full bg-white/60" />
-                <ThemedText className="text-[12px] text-white/80">4.2 (762)</ThemedText>
-              </View>
-              <ThemedText className="text-[12px] text-white/80">{item.subtitle}</ThemedText>
-            </View>
+      <PagerView
+        ref={pagerRef}
+        style={{ flex: 1 }}
+        initialPage={0}
+        onPageScroll={(event) => {
+          const { position, offset } = event.nativeEvent;
+          const nextIndex = Math.round(position + offset);
+          if (nextIndex !== activeIndexRef.current) {
+            activeIndexRef.current = nextIndex;
+            setActiveIndex(nextIndex);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          }
+        }}
+        onPageSelected={(event) => {
+          const nextIndex = event.nativeEvent.position;
+          if (nextIndex !== activeIndexRef.current) {
+            activeIndexRef.current = nextIndex;
+            setActiveIndex(nextIndex);
+          }
+        }}>
+        {CATEGORIES.map((category) => (
+          <View key={category} style={{ flex: 1 }}>
+            <FlatList
+              data={reelsByCategory[category]}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              snapToInterval={reelHeight}
+              snapToAlignment="start"
+              disableIntervalMomentum
+              decelerationRate={0.58}
+              getItemLayout={(_, index) => ({
+                length: reelHeight,
+                offset: reelHeight * index,
+                index,
+              })}
+              renderItem={({ item }) => (
+                <View style={{ height: reelHeight }}>
+                  {item.type === 'image' ? (
+                    <Image source={item.source} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                  ) : (
+                    <Video
+                      source={item.source}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode={ResizeMode.COVER}
+                      isMuted
+                      isLooping
+                      shouldPlay
+                    />
+                  )}
+                  <View className="absolute bottom-0 left-0 right-0 px-6 pb-10">
+                    <View className="mb-2 flex-row items-center gap-3">
+                      <ThemedText
+                        className="text-[13px] font-semibold"
+                        lightColor="#FFFFFF"
+                        darkColor="#FFFFFF">
+                        {item.title}
+                      </ThemedText>
+                      <View className="h-1.5 w-1.5 rounded-full bg-white" />
+                      <ThemedText className="text-[12px]" lightColor="#FFFFFF" darkColor="#FFFFFF">
+                        4.2 (762)
+                      </ThemedText>
+                    </View>
+                    <ThemedText className="text-[12px]" lightColor="#FFFFFF" darkColor="#FFFFFF">
+                      {item.subtitle}
+                    </ThemedText>
+                  </View>
+                </View>
+              )}
+            />
           </View>
-        )}
-      />
+        ))}
+      </PagerView>
     </SafeAreaView>
   );
 }

@@ -44,11 +44,18 @@ const HOME_IMAGES = [
 ];
 
 const APPAREL_IMAGES = [
-  require('@/assets/images/Corridor.png'),
-  require('@/assets/images/nb-1960r.png'),
-  require('@/assets/images/auter.png'),
-  require('@/assets/images/latetowork.png'),
-  require('@/assets/images/oas.png'),
+  require('@/assets/images/Nike - Nike Stride.png'),
+  require('@/assets/images/Nike - Sabrina 3 "Warnign Label".png'),
+  require('@/assets/images/Nike Free Metcon 6 SE.png'),
+  require('@/assets/images/ON - Cloud 6.png'),
+  require('@/assets/images/ON - Club Collective-T Geo.png'),
+  require('@/assets/images/ON - The Roger Pro Fire.png'),
+  require('@/assets/images/Mod Ref - The Colin Top.png'),
+  require('@/assets/images/Mod Ref - The Dominic Shirt.png'),
+  require('@/assets/images/Mod Ref - The Jeremy Top.png'),
+  require('@/assets/images/Buck Mason - Cloudloom Cotton Wool Carry-on Jacket.png'),
+  require('@/assets/images/Buck Mason - Japanese Twill Belted-Back Chore Jacket.png'),
+  require("@/assets/images/Buck Mason - Old Herc' Denim Work Shirt.png"),
 ];
 
 const BEAUTY_IMAGES = [
