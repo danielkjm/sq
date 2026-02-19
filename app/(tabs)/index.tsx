@@ -1,9 +1,9 @@
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Image, type ImageContentFit } from 'expo-image';
-import { ChevronDown, ChevronUp, Menu, Search, ShoppingBag, Star } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Menu, Search, ShoppingBag, SlidersHorizontal, Star } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, PanResponder, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,8 +30,12 @@ const CATEGORY_OPTIONS = [
   'Travel',
   'Pets',
   'Gaming',
+  'Watches',
+  'Baby',
+  'Auto',
 ] as const;
 type CategoryOption = (typeof CATEGORY_OPTIONS)[number];
+const STYLE_FILTER_OPTIONS: CategoryOption[] = ['All', 'Apparel', 'Home', 'Beauty', 'Wellness'];
 
 type BrandLogo = 'nike' | 'uniqlo' | 'oakley' | 'pyra' | 'modref' | 'wordmark';
 
@@ -459,6 +463,7 @@ const AvatarStack = ({ seed }: { seed: string }) => {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth } = useWindowDimensions();
   const pagerRef = useRef<PagerView>(null);
   const tabScrollRef = useRef<ScrollView>(null);
   const tabLayoutsRef = useRef<Record<number, { x: number; width: number }>>({});
@@ -467,6 +472,12 @@ export default function HomeScreen() {
     Experts: 0,
     Friends: 0,
     'Your Brands': 0,
+  });
+  const feedTopInsetProgressByFilterRef = useRef<Record<Filter, Animated.Value>>({
+    All: new Animated.Value(1),
+    Experts: new Animated.Value(1),
+    Friends: new Animated.Value(1),
+    'Your Brands': new Animated.Value(1),
   });
   const isChromeVisibleRef = useRef(true);
   const isPressNavigationRef = useRef(false);
@@ -479,12 +490,44 @@ export default function HomeScreen() {
   const [categoriesRowHeight, setCategoriesRowHeight] = useState(40);
   const [tabViewportWidth, setTabViewportWidth] = useState(0);
   const [tabContentWidth, setTabContentWidth] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryOption>('Apparel');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryOption>('All');
   const [isCategoryDrawerOpen, setIsCategoryDrawerOpen] = useState(false);
-  const drawerOpacity = useRef(new Animated.Value(0)).current;
-  const drawerTranslateY = useRef(new Animated.Value(-14)).current;
-  const floatingCategoriesTop = Math.max(40, topBarHeight + 8);
+  const categoryDrawerOpacity = useRef(new Animated.Value(0)).current;
+  const categoryDrawerTranslateY = useRef(new Animated.Value(-14)).current;
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const filterDrawerProgress = useRef(new Animated.Value(0)).current;
+  const [isPriceRangeOpen, setIsPriceRangeOpen] = useState(true);
+  const [isColorOpen, setIsColorOpen] = useState(false);
+  const [isShoeSizeOpen, setIsShoeSizeOpen] = useState(false);
+  const [isShirtSizeOpen, setIsShirtSizeOpen] = useState(true);
+  const [isStyleOpen, setIsStyleOpen] = useState(false);
+  const filterDrawerWidth = Math.min(344, Math.max(272, viewportWidth * 0.78));
+  const filterDrawerTranslateX = filterDrawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-filterDrawerWidth - 24, 0],
+  });
+  const filterOverlayOpacity = filterDrawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.26],
+  });
+  const floatingCategoriesTop = Math.max(40, topBarHeight + 12);
   const feedTopInset = Math.max(0, floatingCategoriesTop + categoriesRowHeight + 6);
+  const collapsedFeedTopInset = 8;
+  const feedInsetCollapseDistance = Math.max(120, (feedTopInset - collapsedFeedTopInset) * 1.8);
+  const animatedFeedTopInsetByFilter = useMemo(
+    () =>
+      FILTERS.reduce(
+        (acc, filter) => {
+          acc[filter] = feedTopInsetProgressByFilterRef.current[filter].interpolate({
+            inputRange: [0, 1],
+            outputRange: [collapsedFeedTopInset, feedTopInset],
+          });
+          return acc;
+        },
+        {} as Record<Filter, Animated.AnimatedInterpolation<string | number>>
+      ),
+    [collapsedFeedTopInset, feedTopInset]
+  );
   const categoriesHideShift = Math.max(0, floatingCategoriesTop - 6);
   const topBarHideDistance = Math.max(44, topBarHeight + 14);
   const topBarTranslateY = chromeVisibility.interpolate({
@@ -499,9 +542,20 @@ export default function HomeScreen() {
     inputRange: [0, 1],
     outputRange: [96, 0],
   });
+  const categoryModalWidth = Math.min(276, Math.max(238, viewportWidth * 0.76));
 
-  const openCategoryDrawer = useCallback(() => {
-    setIsCategoryDrawerOpen(true);
+  const openFilterDrawer = useCallback(() => {
+    setIsCategoryDrawerOpen(false);
+    setIsFilterDrawerOpen((prev) => {
+      if (!prev) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      return true;
+    });
+  }, []);
+
+  const closeFilterDrawer = useCallback(() => {
+    setIsFilterDrawerOpen(false);
   }, []);
 
   const closeCategoryDrawer = useCallback(() => {
@@ -509,7 +563,14 @@ export default function HomeScreen() {
   }, []);
 
   const toggleCategoryDrawer = useCallback(() => {
-    setIsCategoryDrawerOpen((prev) => !prev);
+    setIsFilterDrawerOpen(false);
+    setIsCategoryDrawerOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      return next;
+    });
   }, []);
 
   const setChromeVisible = useCallback(
@@ -532,21 +593,29 @@ export default function HomeScreen() {
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) => {
-          if (isCategoryDrawerOpen || activeIndexRef.current !== FILTERS.length - 1) {
+          if (isFilterDrawerOpen || isCategoryDrawerOpen) {
+            return false;
+          }
+          const isLeftmostTab = activeIndexRef.current === 0;
+          if (!isLeftmostTab) {
+            return false;
+          }
+          const isFromLeftEdge = gestureState.x0 <= 24;
+          if (!isFromLeftEdge) {
             return false;
           }
           if (Math.abs(gestureState.dx) < Math.abs(gestureState.dy)) {
             return false;
           }
-          return gestureState.dx < -12;
+          return gestureState.dx > 14;
         },
         onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dx < -64) {
-            openCategoryDrawer();
+          if (gestureState.dx > 78 || gestureState.vx > 0.85) {
+            openFilterDrawer();
           }
         },
       }),
-    [isCategoryDrawerOpen, openCategoryDrawer]
+    [isCategoryDrawerOpen, isFilterDrawerOpen, openFilterDrawer]
   );
 
   const rankedByFilter = useMemo(() => {
@@ -600,11 +669,30 @@ export default function HomeScreen() {
   }, [activeIndex, scrollTabIntoView]);
 
   useEffect(() => {
-    drawerOpacity.stopAnimation();
-    drawerTranslateY.stopAnimation();
-    drawerOpacity.setValue(isCategoryDrawerOpen ? 1 : 0);
-    drawerTranslateY.setValue(isCategoryDrawerOpen ? 0 : -14);
-  }, [drawerOpacity, drawerTranslateY, isCategoryDrawerOpen]);
+    filterDrawerProgress.stopAnimation();
+    Animated.timing(filterDrawerProgress, {
+      toValue: isFilterDrawerOpen ? 1 : 0,
+      duration: isFilterDrawerOpen ? 220 : 180,
+      useNativeDriver: true,
+    }).start();
+  }, [filterDrawerProgress, isFilterDrawerOpen]);
+
+  useEffect(() => {
+    categoryDrawerOpacity.stopAnimation();
+    categoryDrawerTranslateY.stopAnimation();
+    Animated.parallel([
+      Animated.timing(categoryDrawerOpacity, {
+        toValue: isCategoryDrawerOpen ? 1 : 0,
+        duration: isCategoryDrawerOpen ? 200 : 160,
+        useNativeDriver: true,
+      }),
+      Animated.timing(categoryDrawerTranslateY, {
+        toValue: isCategoryDrawerOpen ? 0 : -14,
+        duration: isCategoryDrawerOpen ? 200 : 160,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [categoryDrawerOpacity, categoryDrawerTranslateY, isCategoryDrawerOpen]);
 
   const triggerTabHaptic = useCallback((index: number) => {
     if (index === lastHapticIndexRef.current) {
@@ -614,14 +702,30 @@ export default function HomeScreen() {
     void Haptics.selectionAsync();
   }, []);
 
+  const syncFeedTopInset = useCallback(
+    (filter: Filter, yOffset: number) => {
+      const linearProgress = 1 - Math.min(1, yOffset / feedInsetCollapseDistance);
+      const easedProgress = linearProgress * linearProgress * (3 - 2 * linearProgress);
+      feedTopInsetProgressByFilterRef.current[filter].setValue(easedProgress);
+    },
+    [feedInsetCollapseDistance]
+  );
+
   const handleFeedScroll = useCallback(
     (filter: Filter, yOffset: number) => {
       const normalizedOffset = Math.max(0, yOffset);
       const previousOffset = scrollOffsetsRef.current[filter] ?? 0;
       const delta = normalizedOffset - previousOffset;
       scrollOffsetsRef.current[filter] = normalizedOffset;
+      const isActiveFilter = FILTERS[activeIndexRef.current] === filter;
+      syncFeedTopInset(filter, normalizedOffset);
 
-      if (normalizedOffset <= 4) {
+      if (!isActiveFilter) {
+        return;
+      }
+
+      const isAtTop = normalizedOffset <= 4;
+      if (isAtTop) {
         setChromeVisible(true);
         return;
       }
@@ -635,12 +739,22 @@ export default function HomeScreen() {
         setChromeVisible(true);
       }
     },
-    [setChromeVisible]
+    [setChromeVisible, syncFeedTopInset]
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F3F3F3]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <View className="flex-1" {...swipeToDrawerResponder.panHandlers}>
+        <Animated.View
+          className="absolute left-0 right-0 top-0 bg-white"
+          pointerEvents="none"
+          style={{
+            zIndex: 15,
+            height: floatingCategoriesTop,
+            opacity: chromeVisibility,
+            transform: [{ translateY: topBarTranslateY }],
+          }}
+        />
         <Animated.View
           className="absolute left-0 right-0 top-0 z-20 px-6 pt-3"
           pointerEvents={isChromeVisible ? 'auto' : 'none'}
@@ -655,7 +769,7 @@ export default function HomeScreen() {
             transform: [{ translateY: topBarTranslateY }],
           }}>
           <View className="flex-row items-center justify-center">
-            <Pressable className="absolute left-0 h-8 w-8 items-start justify-center" onPress={openCategoryDrawer}>
+            <Pressable className="absolute left-0 h-8 w-8 items-start justify-center" onPress={openFilterDrawer}>
               <Menu size={18} color="#18181B" strokeWidth={2} />
             </Pressable>
             <Pressable className="flex-row items-center gap-1 py-1 pr-1" onPress={toggleCategoryDrawer}>
@@ -680,7 +794,9 @@ export default function HomeScreen() {
           <ScrollView
             ref={tabScrollRef}
             horizontal
+            scrollEnabled={false}
             showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1 }}
             onLayout={(event) => {
               setTabViewportWidth(event.nativeEvent.layout.width);
             }}
@@ -688,7 +804,7 @@ export default function HomeScreen() {
               setTabContentWidth(width);
             }}>
             <View
-              className="flex-row items-center gap-3 pb-2"
+              className="w-full flex-row items-center gap-3 pb-2"
               onLayout={(event) => {
                 const nextHeight = event.nativeEvent.layout.height;
                 if (Math.abs(nextHeight - categoriesRowHeight) > 1) {
@@ -716,7 +832,7 @@ export default function HomeScreen() {
                       scrollTabIntoView(index);
                       pagerRef.current?.setPage(index);
                     }}
-                    className="overflow-hidden rounded-full border"
+                    className="flex-1 overflow-hidden rounded-full border"
                     style={{
                       borderColor: isActive ? 'rgba(17, 24, 39, 0.78)' : 'rgba(255, 255, 255, 0.86)',
                     }}>
@@ -729,7 +845,7 @@ export default function HomeScreen() {
                       <View style={isActive ? styles.dispersionTopDark : styles.dispersionTop} />
                     </View>
                     <ThemedText
-                      className="px-4 py-2 text-[12px] font-semibold"
+                      className="px-2 py-2 text-center text-[11px] font-semibold"
                       numberOfLines={1}
                       style={{ color: isActive ? '#FFFFFF' : '#111827' }}>
                       {label.toUpperCase()}
@@ -771,9 +887,8 @@ export default function HomeScreen() {
 
               const activeFilter = FILTERS[nextIndex];
               const activeOffset = scrollOffsetsRef.current[activeFilter] ?? 0;
-              if (activeOffset <= 4) {
-                setChromeVisible(true);
-              }
+              syncFeedTopInset(activeFilter, activeOffset);
+              setChromeVisible(activeOffset <= 4);
             }}>
             {FILTERS.map((filter) => (
               <View key={filter} style={{ flex: 1 }}>
@@ -783,7 +898,7 @@ export default function HomeScreen() {
                   onScroll={(event) => {
                     handleFeedScroll(filter, event.nativeEvent.contentOffset.y);
                   }}>
-                  <View className="px-4 pb-32" style={{ paddingTop: feedTopInset }}>
+                  <Animated.View className="px-4 pb-32" style={{ paddingTop: animatedFeedTopInsetByFilter[filter] }}>
                   {(() => {
                     const productsForFilter = rankedByFilter[filter];
                     if (productsForFilter.length === 0) {
@@ -800,6 +915,7 @@ export default function HomeScreen() {
 
                     const renderCard = (product: Product) => {
                       const isAllTab = filter === 'All';
+                      const isFriendOrExpertTab = filter === 'Friends' || filter === 'Experts';
                       const reviewMeta = isAllTab ? null : getReviewMeta(product, filter);
 
                       return (
@@ -821,6 +937,19 @@ export default function HomeScreen() {
                               <ThemedText className="ml-1 text-[11px] font-semibold text-zinc-900">
                                 {product.rating.toFixed(1)} ({product.reviewCount})
                               </ThemedText>
+                            </View>
+                          ) : isFriendOrExpertTab ? (
+                            <View className="mt-3 flex-row items-center">
+                              <Star size={12} color="#111827" fill="#111827" strokeWidth={1.8} />
+                              <ThemedText className="ml-1 text-[11px] font-semibold text-zinc-900">
+                                {product.rating.toFixed(1)}
+                              </ThemedText>
+                              <View className="ml-2 flex-row items-center">
+                                <AvatarStack seed={product.id} />
+                                <ThemedText className="ml-2 text-[11px] font-semibold text-zinc-900">
+                                  ({reviewMeta?.count ?? 0})
+                                </ThemedText>
+                              </View>
                             </View>
                           ) : (
                             <View className="mt-3 flex-row items-center justify-between">
@@ -853,7 +982,7 @@ export default function HomeScreen() {
                       </View>
                     );
                   })()}
-                  </View>
+                  </Animated.View>
                 </ScrollView>
               </View>
             ))}
@@ -862,46 +991,172 @@ export default function HomeScreen() {
       </View>
 
       <Animated.View
-        className="absolute inset-0 z-20 bg-black/15"
-        pointerEvents={isCategoryDrawerOpen ? 'auto' : 'none'}
-        style={{ opacity: drawerOpacity }}>
-        <Pressable className="flex-1" onPress={closeCategoryDrawer} />
+        className="absolute inset-0 z-20"
+        pointerEvents={isFilterDrawerOpen ? 'auto' : 'none'}
+        style={{ opacity: filterOverlayOpacity }}>
+        <Pressable className="flex-1 bg-black" onPress={closeFilterDrawer} />
       </Animated.View>
       <Animated.View
-        className="absolute left-0 right-0 top-0 z-30 border-b border-zinc-200 bg-white"
-        pointerEvents={isCategoryDrawerOpen ? 'auto' : 'none'}
+        className="absolute bottom-0 left-0 top-0 z-30 overflow-hidden border-r border-zinc-300 bg-[#ECECEC]"
+        pointerEvents={isFilterDrawerOpen ? 'auto' : 'none'}
         style={{
-          height: '75%',
-          opacity: drawerOpacity,
-          transform: [{ translateY: drawerTranslateY }],
+          width: filterDrawerWidth,
+          transform: [{ translateX: filterDrawerTranslateX }],
         }}>
-        <View className="h-full px-6 pb-4" style={{ paddingTop: insets.top + 52 }}>
-          <View className="flex-row flex-wrap justify-between">
-            {CATEGORY_OPTIONS.map((category) => {
-              const isSelected = category === selectedCategory;
-              return (
-                <Pressable
-                  key={category}
-                  className="mb-10 items-start justify-center pl-3 pr-2"
-                  style={{ width: '31%' }}
-                  onPress={() => {
-                    setSelectedCategory(category);
-                    closeCategoryDrawer();
-                  }}>
-                  <ThemedText
-                    className="text-[12px] tracking-[0.4px]"
-                    numberOfLines={1}
-                    style={{ color: isSelected ? '#111827' : '#6B7280', fontWeight: isSelected ? '700' : '500', textAlign: 'left' }}>
-                    {category.toUpperCase()}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+        <SafeAreaView className="flex-1 bg-[#ECECEC]" edges={['top']}>
+          <View className="h-16 flex-row items-center justify-between border-b border-zinc-300 px-5">
+            <View className="w-8" />
+            <ThemedText className="text-[14px] font-medium text-zinc-800">Filters</ThemedText>
+            <View className="h-8 w-8 items-center justify-center">
+              <SlidersHorizontal size={14} color="#5A5D63" strokeWidth={2} />
+            </View>
           </View>
-          <Pressable className="mt-auto items-center pb-1 pt-2" onPress={closeCategoryDrawer}>
-            <ChevronUp size={14} color="#52525B" strokeWidth={2.2} />
-          </Pressable>
-        </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Pressable className="border-b border-zinc-300 px-5 py-6" onPress={() => setIsPriceRangeOpen((prev) => !prev)}>
+              <View className="flex-row items-center justify-between">
+                <ThemedText className="text-[10px] font-semibold tracking-[1px] text-zinc-700">PRICE RANGE</ThemedText>
+                {isPriceRangeOpen ? (
+                  <ChevronUp size={14} color="#33363D" strokeWidth={2.2} />
+                ) : (
+                  <ChevronDown size={14} color="#33363D" strokeWidth={2.2} />
+                )}
+              </View>
+              {isPriceRangeOpen ? (
+                <View className="items-center pt-5">
+                  <View className="w-[132px]">
+                    <View className="h-[2px] bg-zinc-700/80" />
+                    <View className="absolute left-[16px] top-[-4px] h-[9px] w-[9px] rounded-full bg-black" />
+                    <View className="absolute left-[48px] top-[-4px] h-[9px] w-[9px] rounded-full bg-black" />
+                  </View>
+                  <ThemedText className="mt-3 text-[12px] font-medium text-zinc-800">$300</ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
+
+            <Pressable className="border-b border-zinc-300 px-5 py-6" onPress={() => setIsColorOpen((prev) => !prev)}>
+              <View className="flex-row items-center justify-between">
+                <ThemedText className="text-[10px] font-semibold tracking-[1px] text-zinc-700">COLOR</ThemedText>
+                {isColorOpen ? (
+                  <ChevronUp size={14} color="#33363D" strokeWidth={2.2} />
+                ) : (
+                  <ChevronDown size={14} color="#33363D" strokeWidth={2.2} />
+                )}
+              </View>
+            </Pressable>
+
+            <Pressable className="border-b border-zinc-300 px-5 py-6" onPress={() => setIsShoeSizeOpen((prev) => !prev)}>
+              <View className="flex-row items-center justify-between">
+                <ThemedText className="text-[10px] font-semibold tracking-[1px] text-zinc-700">SHOE SIZE</ThemedText>
+                {isShoeSizeOpen ? (
+                  <ChevronUp size={14} color="#33363D" strokeWidth={2.2} />
+                ) : (
+                  <ChevronDown size={14} color="#33363D" strokeWidth={2.2} />
+                )}
+              </View>
+            </Pressable>
+
+            <Pressable className="border-b border-zinc-300 px-5 py-6" onPress={() => setIsShirtSizeOpen((prev) => !prev)}>
+              <View className="flex-row items-center justify-between">
+                <ThemedText className="text-[10px] font-semibold tracking-[1px] text-zinc-700">SHIRT SIZE</ThemedText>
+                {isShirtSizeOpen ? (
+                  <ChevronUp size={14} color="#33363D" strokeWidth={2.2} />
+                ) : (
+                  <ChevronDown size={14} color="#33363D" strokeWidth={2.2} />
+                )}
+              </View>
+              {isShirtSizeOpen ? (
+                <View className="mt-5 flex-row items-center gap-4">
+                  {['XS', 'S', 'M', 'L'].map((size) => (
+                    <View key={size} className="h-9 w-9 items-center justify-center rounded-full bg-zinc-300">
+                      <ThemedText className="text-[10px] text-zinc-700">{size}</ThemedText>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Pressable>
+
+            <View className="border-b border-zinc-300 px-5 py-6">
+              <Pressable className="flex-row items-center justify-between" onPress={() => setIsStyleOpen((prev) => !prev)}>
+                <ThemedText className="text-[10px] font-semibold tracking-[1px] text-zinc-700">STYLE</ThemedText>
+                {isStyleOpen ? (
+                  <ChevronUp size={14} color="#33363D" strokeWidth={2.2} />
+                ) : (
+                  <ChevronDown size={14} color="#33363D" strokeWidth={2.2} />
+                )}
+              </Pressable>
+              {isStyleOpen ? (
+                <View className="mt-5 flex-row flex-wrap gap-2">
+                  {STYLE_FILTER_OPTIONS.map((category) => {
+                    const isSelected = selectedCategory === category;
+                    return (
+                      <Pressable
+                        key={category}
+                        onPress={() => setSelectedCategory(category)}
+                        className="rounded-full border px-3 py-2"
+                        style={{
+                          borderColor: isSelected ? '#18181B' : '#A1A1AA',
+                          backgroundColor: isSelected ? '#18181B' : 'transparent',
+                        }}>
+                        <ThemedText
+                          className="text-[11px] font-medium"
+                          style={{ color: isSelected ? '#FAFAFA' : '#3F3F46' }}>
+                          {category.toUpperCase()}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Animated.View>
+
+      <Animated.View
+        className="absolute inset-0 z-40"
+        pointerEvents={isCategoryDrawerOpen ? 'auto' : 'none'}
+        style={{ opacity: categoryDrawerOpacity }}>
+        <Pressable className="absolute inset-0" onPress={closeCategoryDrawer}>
+          <BlurView intensity={70} tint="light" style={StyleSheet.absoluteFillObject} />
+          <View className="absolute inset-0 bg-white/28" />
+        </Pressable>
+        <Animated.View
+          className="flex-1 items-center"
+          pointerEvents="box-none"
+          style={{
+            paddingTop: insets.top + 52,
+            paddingBottom: insets.bottom + 6,
+            transform: [{ translateY: categoryDrawerTranslateY }],
+          }}>
+          <View style={{ width: categoryModalWidth, flex: 1 }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 12 }}
+              bounces={false}>
+              {CATEGORY_OPTIONS.map((category) => {
+                const isSelected = category === selectedCategory;
+                return (
+                  <Pressable
+                    key={category}
+                    className="items-center px-4 py-[16px]"
+                    onPress={() => {
+                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedCategory(category);
+                      closeCategoryDrawer();
+                    }}>
+                    <ThemedText
+                      className="text-[12px] tracking-[0.8px]"
+                      numberOfLines={1}
+                      style={{ color: isSelected ? '#111111' : '#525252', fontWeight: isSelected ? '700' : '500' }}>
+                      {category.toUpperCase()}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Animated.View>
       </Animated.View>
 
       <Animated.View
